@@ -1,0 +1,207 @@
+<!-- Based on/ Copied from: http://bl.ocks.org/mbostock/899711 -->
+
+<!DOCTYPE html>
+<html>
+  <head>
+        <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no"/>
+    <script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=true"></script>
+    <script type="text/javascript" src="http://mbostock.github.com/d3/d3.js?1.29.1"></script>
+    <style type="text/css">
+
+html, body, #map {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+#map {
+  width:1000px;
+  height:400px;
+}
+
+.stations, .stations svg {
+  position: absolute;
+}
+
+.stations svg {
+  width: 60px;
+  height: 20px;
+  padding-right: 100px;
+  font: 10px sans-serif;
+}
+
+.stations circle {
+  fill: brown;
+  stroke: black;
+  /*stroke-width: .4px;*/
+}
+
+    </style>
+ <script src="http://d3js.org/d3.v3.min.js"></script>
+        <script type="text/javascript" src="/pico/client.js"></script>
+            <script src="//code.jquery.com/jquery-1.10.2.js"></script>
+      <script src="//code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
+    <script type="text/javascript">
+        pico.load('example');
+        var displayMessage=function(message){
+          document.getElementById('message').innerHTML = message;
+        }
+        function submitForm(){
+          categories=get_categories();
+          console.log(categories);
+          example.calculate(33.45,-112.006,categories,displayMessage);
+
+        }
+
+        function get_categories(){
+          var selected=new Array();
+          $('#category input:checked').each(function(){
+            selected.push($(this).val());
+          });
+          return selected;
+        }
+    </script>
+
+  </head>
+  <body>
+    <div class="row">
+        <div class="col-md-2"></div>
+        <div class="col-md-8">
+            <div class="page-header center">
+                <h1>Part 2: <small>Predicting Business Success</small></h1>
+            </div>
+              <div>
+<!--             <iframe src="vis.html" name="targetframe" allowTransparency="true" scrolling="no" frameborder="0" width="1000" height="400"></iframe> -->
+
+            <h2>Try it out! </h2>
+            <p> Input a combination of categories and the latitude and longitude. </p>
+            <form id="category">
+
+              <input type="checkbox" name="category" value="Restaurants"> Restaurants
+              <input type="checkbox" name="category" value="Shopping"> Shopping
+              <input type="checkbox" name="category" value="Food"> Food
+              <input type="checkbox" name="category" value="Beauty & Spas"> Beauty & Spas
+              <input type="checkbox" name="category" value="Automotive"> Automotive
+              <input type="checkbox" name="category" value="Mexican"> Mexican<br>
+              <input type="checkbox" name="category" value="Health & Medical"> Health & Medical
+              <input type="checkbox" name="category" value="Home Services"> Home Services
+              <input type="checkbox" name="category" value="Nightlife"> Nightlife 
+              <input type="checkbox" name="category" value="Fashion"> Fashion 
+              <input type="checkbox" name="category" value="Active Life"> Active Life
+              <input type="checkbox" name="category" value="Bars"> Bars<br>
+              <input type="checkbox" name="category" value="Sandwiches"> Sandwiches
+              <input type="checkbox" name="category" value="American (Traditional)"> American (Traditional)
+              <input type="checkbox" name="category" value="Fast Food"> Fast Food
+              <input type="checkbox" name="category" value="Pizza"> Pizza
+              <input type="checkbox" name="category" value="Event Planning & Services"> Event Planning & Services<br>
+              <input type="checkbox" name="category" value="Local Services"> Local Services
+              <input type="checkbox" name="category" value="Hotels & Travel"> Hotels & Travel
+              <input type="checkbox" name="category" value="American (New)"> American (New)
+              <input type="checkbox" name="category" value="Grocery"> Grocery
+              <input type="checkbox" name="category" value="Coffee & Tea"> Coffee & Tea<br>
+              <input type="checkbox" name="category" value="Arts & Entertainment"> Arts & Entertainment
+              <input type="checkbox" name="category" value="Burgers"> Burgers
+              <input type="checkbox" name="category" value="Home & Garden"> Home & Garden
+              <input type="checkbox" name="category" value="Italian"> Italian
+              <input type="checkbox" name="category" value="Chinese"> Chinese<br>
+              <input type="checkbox" name="category" value="Hotels"> Hotels
+              <input type="checkbox" name="category" value="Auto Repair"> Auto Repair
+              <input type="checkbox" name="category" value="Breakfast & Brunch"> Breakfast & Brunch
+            </form>
+
+            <button id="submitForm" onclick="submitForm()">Submit</button>
+            <div id='message'> </div>
+
+
+        <div class="col-md-2"></div>
+    </div>
+
+
+    <div id="map"></div>
+    <script type="text/javascript">
+
+colors = ['#ffffcc','#ffeda0','#fed976','#feb24c','#fd8d3c','#fc4e2a','#e31a1c','#bd0026','#800026']
+
+// Create the Google Map…
+var map = new google.maps.Map(d3.select("#map").node(), {
+  zoom: 18,
+  center: new google.maps.LatLng(33.4500, -112.0667),
+  mapTypeId: google.maps.MapTypeId.TERRAIN
+});
+
+// Load the station data. When the data comes back, create an overlay.
+d3.json("predictions.json", function(data) {
+
+  var overlay = new google.maps.OverlayView();
+
+  // Add the container when the overlay is added to the map.
+  overlay.onAdd = function() {
+    var layer = d3.select(this.getPanes().overlayLayer).append("div")
+        .attr("class", "stations");
+
+    // Draw each marker as a separate SVG element.
+    // We could use a single SVG, but what size would it have?
+    overlay.draw = function() {
+      var projection = this.getProjection(),
+          padding = 10;
+
+      var marker = layer.selectAll("svg")
+          .data(d3.entries(data))
+          .each(transform) // update existing markers
+        .enter().append("svg:svg")
+          .each(transform)
+          .attr("class", "marker");
+
+      var mouse_cord = new google.maps.LatLng(0, 0);
+      var m = new google.maps.Marker({
+          position: mouse_cord,
+          icon: {
+            path: google.maps.SymbolPath.BACKWARD_OPEN_ARROW,
+            scale: 4,
+            strokeColor : '#023858',
+          },
+          map: map
+      });
+
+      google.maps.event.addListener(map, 'click', function(event) { 
+                                mouse_cord = event.latLng; 
+                                console.log(mouse_cord);
+                                m.setPosition(mouse_cord);
+                        }); 
+
+      for(var key in data){
+        var col = Math.round(3*Math.abs(data[key][2]-data[key][3]))
+        col = Math.min(8,col);
+
+        new google.maps.Marker({
+          position: new google.maps.LatLng(data[key][0], data[key][1]),
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 1.5*data[key][2]-0.5,
+            strokeColor : colors[8-col],
+          },
+          map: map,
+          title: key+'\nrating: '+data[key][2]+'\npredicted: '+data[key][3]
+      });
+      }
+
+      function transform(d) {
+
+        d = new google.maps.LatLng(d.value[0], d.value[1]);
+        d = projection.fromLatLngToDivPixel(d);
+        return d3.select(this)
+            .style("left", (d.x - padding) + "px")
+            .style("top", (d.y - padding) + "px");
+      }
+    };
+  };
+
+  // Bind our overlay to the map…
+  overlay.setMap(map);
+});
+
+    </script>
+  </body>
+</html>
